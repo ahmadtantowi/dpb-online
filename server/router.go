@@ -16,11 +16,13 @@ func NewRouter(logger *slog.Logger, db *db.Database) http.Handler {
 	// Serve generated swagger UI and docs from the generated docs package.
 	mux.Handle("GET /swagger/", httpSwagger.WrapHandler)
 
-	// mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-	// 	w.Write([]byte("hello world"))
-	// })
+	// Serve a simple index.html at GET /
+	mux.Handle("GET /", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "server/static/index.html")
+	}))
 
 	mux.Handle("GET /{nik}", check_nik.CheckNIKHandler(logger, db))
+	mux.Handle("GET /check", check_nik.CheckNIKQueryHandler(logger, db))
 
 	return middleware.NewLoggingMiddleware(logger, mux)
 }

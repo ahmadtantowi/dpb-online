@@ -46,7 +46,7 @@ info:
 paths:
   /{nik}:
     get:
-      description: Lookup pemilih (voter) data by NIK.
+      description: Lookup pemilih (voter) data by NIK using a path parameter.
       parameters:
       - description: NIK
         in: path
@@ -72,7 +72,38 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/dto.Response-string'
-      summary: Check NIK
+      summary: Check NIK (path)
+      tags:
+      - Voter
+  /check:
+    get:
+      description: Lookup pemilih (voter) data by NIK using a query parameter.
+      parameters:
+      - description: NIK
+        in: query
+        name: nik
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.Response-check_nik_CheckNIKResp'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/dto.Response-string'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/dto.Response-string'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/dto.Response-string'
+      summary: Check NIK (query)
       tags:
       - Voter
 swagger: "2.0"

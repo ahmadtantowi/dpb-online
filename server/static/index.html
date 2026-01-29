@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width,initial-scale=1" />
+        <title>Check NIK</title>
+
+        <!-- htmx -->
+        <script src="https://unpkg.com/htmx.org@1.11.0"></script>
+
+        <style>
+            :root {
+                --bg: #ffffff;
+                --muted: #6b7280;
+                --card: #f7f7fb;
+                --accent: #2563eb;
+            }
+            body {
+                font-family:
+                    system-ui,
+                    -apple-system,
+                    "Segoe UI",
+                    Roboto,
+                    "Helvetica Neue",
+                    Arial;
+                background: var(--bg);
+                color: #0f172a;
+                padding: 2rem;
+                max-width: 780px;
+                margin: 0 auto;
+            }
+            h1 {
+                margin: 0 0 0.5rem 0;
+                font-size: 1.5rem;
+            }
+            p {
+                margin-top: 0;
+                color: var(--muted);
+            }
+            .row {
+                display: flex;
+                gap: 0.5rem;
+                margin-top: 1rem;
+                align-items: center;
+            }
+            input[type="text"] {
+                flex: 1;
+                padding: 0.5rem 0.75rem;
+                font-size: 1rem;
+                border: 1px solid #e6e7ee;
+                border-radius: 0.375rem;
+            }
+            button {
+                background: var(--accent);
+                color: white;
+                border: none;
+                padding: 0.55rem 0.9rem;
+                border-radius: 0.375rem;
+                cursor: pointer;
+                font-weight: 600;
+            }
+            button:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+            #result {
+                margin-top: 1.25rem;
+                padding: 1rem;
+                border-radius: 0.5rem;
+                background: var(--card);
+                min-height: 3.5rem;
+                white-space: pre-wrap;
+                font-family:
+                    ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono",
+                    monospace;
+                font-size: 0.95rem;
+                color: #0b1220;
+                border: 1px solid #ececf3;
+            }
+            .hint {
+                font-size: 0.9rem;
+                color: var(--muted);
+                margin-top: 0.5rem;
+            }
+            .small {
+                font-size: 0.85rem;
+                color: var(--muted);
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Check NIK</h1>
+        <p class="small">
+            Enter an Indonesian NIK (national ID) and click
+            <strong>Check</strong>.
+        </p>
+
+        <div class="row" role="search" aria-label="Check NIK">
+            <input
+                id="nik"
+                type="text"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                placeholder="Enter NIK"
+                aria-label="NIK"
+            />
+            <button id="checkBtn" type="button">Check</button>
+        </div>
+
+        <div id="result" aria-live="polite">Result will appear here...</div>
+
+        <!-- Hidden anchor used to perform htmx GET requests dynamically -->
+        <a
+            id="hxAnchor"
+            style="display: none"
+            hx-target="#result"
+            hx-swap="innerHTML"
+        ></a>
+
+        <script>
+            (function () {
+                const btn = document.getElementById("checkBtn");
+                const nikInput = document.getElementById("nik");
+                const result = document.getElementById("result");
+                const hxAnchor = document.getElementById("hxAnchor"); // kept for fallback only
+
+                const TIMEOUT_MS = 8000; // 8 seconds
+
+                function setLoading(loading) {
+                    btn.disabled = loading;
+                    if (loading) {
+                        result.textContent = "Loading...";
+                        console.debug("[CheckNIK] Loading...");
+                    } else {
+                        console.debug("[CheckNIK] Not loading");
+                    }
+                }
+
+                // fetch wrapper with timeout using AbortController
+                async function fetchWithTimeout(
+                    url,
+                    opts = {},
+                    timeoutMs = TIMEOUT_MS,
+                ) {
+                    const controller = new AbortController();
+                    const id = setTimeout(() => {
+                        controller.abort();
+                    }, timeoutMs);
+
+                    try {
+                        const resp = await fetch(url, {
+                            signal: controller.signal,
+                            ...opts,
+                        });
+                        clearTimeout(id);
+                        return resp;
+                    } catch (err) {
+                        clearTimeout(id);
+                        throw err;
+                    }
+                }
+
+                async function fetchNIK(nik) {
+                    const url = "/check?nik=" + encodeURIComponent(nik);
+                    console.debug("[CheckNIK] Requesting", url);
+
+                    try {
+                        const resp = await fetchWithTimeout(
+                            url,
+                            {
+                                method: "GET",
+                                headers: {
+                                    Accept: "application/json, text/plain, */*",
+                                },
+                                credentials: "same-origin",
+                            },
+                            TIMEOUT_MS,
+                        );
+
+                        const text = await resp.text();
+                        console.debug(
+                            "[CheckNIK] Response status:",
+                            resp.status,
+                        );
+
+                        // If response not ok, try to show helpful error message
+                        if (!resp.ok) {
+                            try {
+                                const obj = JSON.parse(text);
+                                result.innerHTML =
+                                    "<pre>" +
+                                    JSON.stringify(obj, null, 2) +
+                                    "</pre>";
+                                console.warn(
+                                    "[CheckNIK] Server returned error JSON",
+                                    obj,
+                                );
+                            } catch (e) {
+                                const msg =
+                                    text ||
+                                    resp.statusText ||
+                                    "Error: " + resp.status;
+                                result.textContent = msg;
+                                console.warn(
+                                    "[CheckNIK] Server returned error text",
+                                    msg,
+                                );
+                            }
+                            return;
+                        }
+
+                        // Success: pretty-print JSON if possible
+                        try {
+                            const obj = JSON.parse(text);
+                            result.innerHTML =
+                                "<pre>" +
+                                JSON.stringify(obj, null, 2) +
+                                "</pre>";
+                            console.info("[CheckNIK] Success", obj);
+                        } catch (e) {
+                            // not JSON
+                            result.textContent = text;
+                            console.info("[CheckNIK] Non-JSON response", text);
+                        }
+                    } catch (err) {
+                        // handle AbortError (timeout) separately for clearer UX
+                        if (err && err.name === "AbortError") {
+                            result.textContent =
+                                "Request timed out after " +
+                                TIMEOUT_MS / 1000 +
+                                "s";
+                            console.warn("[CheckNIK] Request timed out", url);
+                        } else {
+                            console.error(
+                                "[CheckNIK] Network/Fetch error",
+                                err,
+                            );
+                            // Try htmx fallback if available
+                            if (
+                                typeof htmx !== "undefined" &&
+                                typeof htmx.trigger === "function"
+                            ) {
+                                console.debug(
+                                    "[CheckNIK] Falling back to htmx request",
+                                );
+                                hxAnchor.setAttribute("hx-get", url);
+                                htmx.trigger(hxAnchor, "click");
+                                return;
+                            }
+                            result.textContent =
+                                "Network error: " +
+                                (err && err.message
+                                    ? err.message
+                                    : String(err));
+                        }
+                    } finally {
+                        setLoading(false);
+                    }
+                }
+
+                btn.addEventListener("click", () => {
+                    const nik = nikInput.value.trim();
+                    if (!nik) {
+                        result.textContent = "Please enter a NIK";
+                        console.debug("[CheckNIK] Empty NIK - aborting");
+                        return;
+                    }
+
+                    setLoading(true);
+
+                    // Primary: fetch with timeout
+                    if (typeof fetch === "function") {
+                        fetchNIK(nik);
+                    } else if (
+                        typeof htmx !== "undefined" &&
+                        typeof htmx.trigger === "function"
+                    ) {
+                        // fallback to htmx if fetch not available
+                        const url = "/check?nik=" + encodeURIComponent(nik);
+                        hxAnchor.setAttribute("hx-get", url);
+                        htmx.trigger(hxAnchor, "click");
+                    } else {
+                        // last resort: navigate (will replace page)
+                        window.location.href =
+                            "/check?nik=" + encodeURIComponent(nik);
+                    }
+                });
+
+                // Allow Enter in input to submit
+                nikInput.addEventListener("keydown", (ev) => {
+                    if (ev.key === "Enter") {
+                        ev.preventDefault();
+                        btn.click();
+                    }
+                });
+            })();
+        </script>
+    </body>
+</html>
