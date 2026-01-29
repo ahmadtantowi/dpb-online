@@ -21,6 +21,16 @@ type CheckNIKResp struct {
 	TPSAddress  string `json:"tps_address"`
 }
 
+// @Summary Check NIK
+// @Description Lookup pemilih (voter) data by NIK.
+// @Tags Voter
+// @Produce application/json
+// @Param nik path string true "NIK"
+// @Success 200 {object} dto.Response[CheckNIKResp]
+// @Failure 400 {object} dto.Response[string]
+// @Failure 404 {object} dto.Response[string]
+// @Failure 500 {object} dto.Response[string]
+// @Router /{nik} [get]
 func CheckNIKHandler(logger *slog.Logger, db *db.Database) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		nik := r.PathValue("nik")

@@ -1,3 +1,6 @@
+// @title DPB Online API
+// @version 0.1.0
+// @description API for checking NIK in the voter database
 package main
 
 import (
@@ -6,6 +9,8 @@ import (
 	"dpb-online/server"
 	"log/slog"
 	"os"
+
+	_ "dpb-online/docs" // Import generated swagger docs
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -31,6 +36,10 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+
+	// populate the generated swag docs info at runtime so the UI shows the correct host
+	// docs.SwaggerInfo.Host = "localhost:" + port
+	// docs.SwaggerInfo.BasePath = "/"
 
 	routerHandler := server.NewRouter(logger, db)
 	server := server.NewServer(logger, ":"+port, server.WithRouter(routerHandler))
